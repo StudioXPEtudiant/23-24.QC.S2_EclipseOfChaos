@@ -4,46 +4,75 @@ using UnityEngine;
 
 public class PlayerController : MonoBehaviour
 {
-    [SerializeField] private GameObject head;
+    public float moveSpeed = 5f;
+    public float jumpForce = 10f;
+    public float fastSpeedMultiplier = 2f;
+    public float normalFOV = 60f;
+    public float fastFOV = 80f;
 
-    private float _headTilt = 0;
-
-    private CharacterController _characterController;
-
-    private Vector3 _movementX;
-    private Vector3 _movementZ;
+    private CharacterController characterController;
+    private Camera playerCamera;
+    private float originalFOV;
+    private bool isGrounded;
+    private float turnSmoothVelocity;
+    private float turnSmoothTime;
 
     void Start()
     {
-        _characterController = GetComponent<CharacterController>();
+        characterController = GetComponent<CharacterController>();
+        playerCamera = Camera.main;
+        originalFOV = playerCamera.fieldOfView;
     }
 
     void Update()
     {
-        Vector3 movement = (_movementX + _movementZ).normalized;
+        // Check if the player is grounded
+        isGrounded = characterController.isGrounded;
 
-        _characterController.Move(Physics.gravity * Time.deltaTime);
-        _characterController.Move(movement * Time.deltaTime * 4);
+        // Move the player
+        MovePlayer();
+
+        // Jump
+        if (isGrounded && Input.GetKeyDown(KeyCode.Space))
+        {
+            Jump();
+        }
+
+        // Sprint (increase speed and FOV)
+        if (Input.GetKey(KeyCode.LeftShift))
+        {
+            moveSpeed *= fastSpeedMultiplier;
+            playerCamera.fieldOfView = fastFOV;
+        }
+        else
+        {
+            moveSpeed /= fastSpeedMultiplier;
+            playerCamera.fieldOfView = normalFOV;
+        }
     }
 
-    public void TiltHead(float mouseYValue)
+    private void MovePlayer()
     {
-        _headTilt -= mouseYValue;
-        head.transform.localRotation = Quaternion.Euler(_headTilt, 0, 0);
+        float horizontal = Input.GetAxis("Horizontal");
+        float vertical = Input.GetAxis("Vertical");
+
+        Vector3 direction = new Vector3(horizontal, 0f, vertical).normalized;
+
+        if (direction.magnitude >= 0.1f)
+        {
+            float targetAngle = Mathf.Atan2(direction.x, direction.z) * Mathf.Rad2Deg + playerCamera.transform.eulerAngles.y;
+            float angle = Mathf.SmoothDampAngle(transform.eulerAngles.y, targetAngle, ref turnSmoothVelocity, turnSmoothTime);
+
+            Vector3 moveDirection = Quaternion.Euler(0f, targetAngle, 0f) * Vector3.forward;
+            characterController.Move(moveDirection.normalized * moveSpeed * Time.deltaTime);
+
+            // Rotate the player to face the moving direction
+            transform.rotation = Quaternion.Euler(0f, angle, 0f);
+        }
     }
 
-    public void RotateY(float mouseXValue)
+    private void Jump()
     {
-        transform.Rotate(0, mouseXValue, 0);
-    }
-
-    public void SetMovementX(float horizontalValue)
-    {
-        _movementX = transform.right * horizontalValue;
-    }
-
-    public void SetMovementZ(float verticalValue)
-    {
-        _movementZ = transform.forward * verticalValue;
+        characterController.Move(Vector3.up * jumpForce * Time.deltaTime);
     }
 }
