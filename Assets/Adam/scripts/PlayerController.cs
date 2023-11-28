@@ -4,75 +4,61 @@ using UnityEngine;
 
 public class PlayerController : MonoBehaviour
 {
-    public float moveSpeed = 5f;
+    public float walkSpeed = 5f;
+    public float runSpeed = 10f;
     public float jumpForce = 10f;
-    public float fastSpeedMultiplier = 2f;
-    public float normalFOV = 60f;
-    public float fastFOV = 80f;
 
-    private CharacterController characterController;
-    private Camera playerCamera;
-    private float originalFOV;
+    private bool isRunning = false;
     private bool isGrounded;
-    private float turnSmoothVelocity;
-    private float turnSmoothTime;
+
+    private Rigidbody rb;
 
     void Start()
     {
-        characterController = GetComponent<CharacterController>();
-        playerCamera = Camera.main;
-        originalFOV = playerCamera.fieldOfView;
+        rb = GetComponent<Rigidbody>();
     }
 
     void Update()
     {
-        // Check if the player is grounded
-        isGrounded = characterController.isGrounded;
+        // Check if the character is on the ground
+        isGrounded = Physics.Raycast(transform.position, Vector3.down, 0.1f);
 
-        // Move the player
-        MovePlayer();
+        // Get input from the arrow keys
+        float horizontalInput = Input.GetAxis("Horizontal");
+        float verticalInput = Input.GetAxis("Vertical");
 
-        // Jump
-        if (isGrounded && Input.GetKeyDown(KeyCode.Space))
+        // Get whether the left shift key is pressed
+        isRunning = Input.GetKey(KeyCode.LeftShift);
+
+        // Calculate movement direction
+        Vector3 movement = new Vector3(horizontalInput, 0f, verticalInput);
+        movement.Normalize(); // Normalize to prevent faster diagonal movement
+
+        // Apply movement to the object
+        Move(movement);
+
+        // Jumping
+        if (Input.GetButtonDown("Jump") && isGrounded)
         {
             Jump();
         }
-
-        // Sprint (increase speed and FOV)
-        if (Input.GetKey(KeyCode.LeftShift))
-        {
-            moveSpeed *= fastSpeedMultiplier;
-            playerCamera.fieldOfView = fastFOV;
-        }
-        else
-        {
-            moveSpeed /= fastSpeedMultiplier;
-            playerCamera.fieldOfView = normalFOV;
-        }
     }
 
-    private void MovePlayer()
+    void Move(Vector3 direction)
     {
-        float horizontal = Input.GetAxis("Horizontal");
-        float vertical = Input.GetAxis("Vertical");
+        // Calculate movement speed
+        float speed = isRunning ? runSpeed : walkSpeed;
 
-        Vector3 direction = new Vector3(horizontal, 0f, vertical).normalized;
+        // Calculate movement vector
+        Vector3 movement = direction * speed * Time.deltaTime;
 
-        if (direction.magnitude >= 0.1f)
-        {
-            float targetAngle = Mathf.Atan2(direction.x, direction.z) * Mathf.Rad2Deg + playerCamera.transform.eulerAngles.y;
-            float angle = Mathf.SmoothDampAngle(transform.eulerAngles.y, targetAngle, ref turnSmoothVelocity, turnSmoothTime);
-
-            Vector3 moveDirection = Quaternion.Euler(0f, targetAngle, 0f) * Vector3.forward;
-            characterController.Move(moveDirection.normalized * moveSpeed * Time.deltaTime);
-
-            // Rotate the player to face the moving direction
-            transform.rotation = Quaternion.Euler(0f, angle, 0f);
-        }
+        // Apply movement to the object
+        transform.Translate(movement);
     }
 
-    private void Jump()
+    void Jump()
     {
-        characterController.Move(Vector3.up * jumpForce * Time.deltaTime);
+        // Apply upward force for jumping
+        rb.AddForce(Vector3.up * jumpForce, ForceMode.Impulse);
     }
 }
